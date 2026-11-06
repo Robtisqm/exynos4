@@ -115,7 +115,7 @@ static int max17042_get_temperature(struct max17042_chip *chip, int *temp)
 static int max17042_get_status(struct max17042_chip *chip, int *status)
 {
 	int ret, charge_full, charge_now;
-	int avg_current;
+	int avg_current, curr;
 	u32 data;
 
 	ret = power_supply_am_i_supplied(chip->battery);
@@ -160,6 +160,18 @@ static int max17042_get_status(struct max17042_chip *chip, int *status)
 		return 0;
 	}
 
+	/* Check instantaneous current first for faster response (3-5s vs 30s) */
+	ret = regmap_read(chip->regmap, MAX17042_Current, &data);
+	if (ret == 0) {
+		curr = sign_extend32(data, 15);
+		curr *= 1562500 / chip->pdata->r_sns;
+		if (curr > 0) {
+			*status = POWER_SUPPLY_STATUS_CHARGING;
+			return 0;
+		}
+	}
+
+	/* Fallback to IIR-filtered average current */
 	ret = regmap_read(chip->regmap, MAX17042_AvgCurrent, &data);
 	if (ret < 0)
 		return ret;
