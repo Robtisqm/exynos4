@@ -15,6 +15,7 @@
 #include <dt-bindings/gpio/gpio.h>
 #include <dt-bindings/input/linux-event-codes.h>
 #include <dt-bindings/interrupt-controller/irq.h>
+#include <dt-bindings/leds/common.h>
 #include <dt-bindings/power/summit,smb347-charger.h>
 #include "exynos-pinctrl.h"
 
@@ -130,6 +131,7 @@
 		regulator-min-microvolt = <2800000>;
 		regulator-max-microvolt = <2800000>;
 		gpios = <&gpm0 0 GPIO_ACTIVE_HIGH>;
+		vin-supply = <&vbatt>;
 		enable-active-high;
 	};
 
@@ -188,6 +190,7 @@
 		fuel-gauge@36 {
 			compatible = "maxim,max17042";
 			reg = <0x36>;
+			power-supplies = <&power_supply>;
 			pinctrl-0 = <&fuel_alert_irq>;
 			pinctrl-names = "default";
 			interrupt-parent = <&gpx2>;
@@ -238,6 +241,10 @@
 		power_supply: charger@6 {
 			compatible = "summit,smb347";
 			reg = <0x6>;
+			pinctrl-0 = <&charger_irq>;
+			pinctrl-names = "default";
+			interrupt-parent = <&gpm0>;
+			interrupts = <3 IRQ_TYPE_EDGE_BOTH>;
 			summit,enable-usb-charging;
 			summit,enable-charge-control = <SMB3XX_CHG_ENABLE_SW>;
 			summit,fast-voltage-threshold-microvolt = <2600000>;
@@ -321,9 +328,8 @@
 			"LINE", "LINEOUT2N",
 			"LINE", "LINEOUT2P",
 
-			"IN1LP", "MICBIAS1",
-			"IN1LN", "MICBIAS1",
-			"Main Mic", "MICBIAS1",
+			"IN1LP", "Main Mic",
+			"IN1LN", "Main Mic",
 
 			"IN1RP", "Sub Mic",
 			"IN1RN", "Sub Mic",
@@ -336,6 +342,22 @@
 		};
 		codec {
 			sound-dai = <&wm1811>;
+		};
+	};
+
+	led-controller {
+		compatible = "skyworks,aat1290";
+		flen-gpios = <&gpm3 7 GPIO_ACTIVE_HIGH>;
+		enset-gpios = <&gpm3 6 GPIO_ACTIVE_HIGH>;
+		pinctrl-names = "default";
+		pinctrl-0 = <&cam_flash>;
+
+		led {
+			function = LED_FUNCTION_FLASH;
+			color = <LED_COLOR_ID_WHITE>;
+			led-max-microamp = <520833>;
+			flash-max-microamp = <1012500>;
+			flash-max-timeout-us = <1940000>;
 		};
 	};
 
@@ -394,6 +416,17 @@
 	status = "okay";
 };
 
+&camera {
+	pinctrl-0 = <&cam_port_a_clk_active &cam_port_b_clk_active>;
+	pinctrl-names = "default";
+	assigned-clocks = <&clock CLK_MOUT_CAM0>,
+			  <&clock CLK_MOUT_CAM1>;
+	assigned-clock-parents = <&clock CLK_XUSBXTI>,
+				 <&clock CLK_XUSBXTI>;
+
+	status = "okay";
+};
+
 &cpu0 {
 	cpu0-supply = <&buck2_reg>;
 };
@@ -413,7 +446,78 @@
 	};
 };
 
+&csis_1 {
+	vddcore-supply = <&ldo8_reg>;
+	vddio-supply = <&ldo10_reg>;
+	assigned-clocks = <&clock CLK_MOUT_CSIS1>,
+			  <&clock CLK_SCLK_CSIS1>;
+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+	assigned-clock-rates = <0>, <176000000>;
+
+	status = "okay";
+
+	/* Camera D (4) MIPI CSI-2 (CSIS1) */
+	port@4 {
+		reg = <4>;
+
+		csis1_ep: endpoint {
+			remote-endpoint = <&is_s5k6a3_ep>;
+			data-lanes = <1>;
+			samsung,csis-hs-settle = <18>;
+			samsung,csis-wclk;
+		};
+	};
+};
+
 &exynos_usbphy {
+	status = "okay";
+};
+
+&fimc_0 {
+	assigned-clocks = <&clock CLK_MOUT_FIMC0>,
+			  <&clock CLK_SCLK_FIMC0>;
+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+	assigned-clock-rates = <0>, <166750000>;
+
+	status = "okay";
+};
+
+&fimc_1 {
+	assigned-clocks = <&clock CLK_MOUT_FIMC1>,
+			  <&clock CLK_SCLK_FIMC1>;
+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+	assigned-clock-rates = <0>, <166750000>;
+
+	status = "okay";
+};
+
+&fimc_2 {
+	assigned-clocks = <&clock CLK_MOUT_FIMC2>,
+			  <&clock CLK_SCLK_FIMC2>;
+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+	assigned-clock-rates = <0>, <166750000>;
+
+	status = "okay";
+};
+
+&fimc_3 {
+	assigned-clocks = <&clock CLK_MOUT_FIMC3>,
+			  <&clock CLK_SCLK_FIMC3>;
+	assigned-clock-parents = <&clock CLK_MOUT_MPLL_USER_T>;
+	assigned-clock-rates = <0>, <166750000>;
+
+	status = "okay";
+};
+
+&fimc_is {
+	status = "okay";
+};
+
+&fimc_lite_0 {
+	status = "okay";
+};
+
+&fimc_lite_1 {
 	status = "okay";
 };
 
@@ -476,6 +580,33 @@
 		mount-matrix =	"1",  "0",  "0",
 				"0", "-1",  "0",
 				"0",  "0", "-1";
+	};
+};
+
+&i2c1_isp {
+	pinctrl-0 = <&fimc_is_i2c1>;
+	pinctrl-names = "default";
+
+	s5k6a3@10 {
+		compatible = "samsung,s5k6a3";
+		reg = <0x10>;
+		pinctrl-0 = <&cam_vt_nrst>;
+		pinctrl-names = "default";
+		svdda-supply = <&ldo24_reg>;
+		svddio-supply = <&ldo19_reg>;
+		afvdd-supply = <&ldo19_reg>;
+		clock-frequency = <24000000>;
+		/* CAM_B_CLKOUT */
+		clocks = <&camera 1>;
+		clock-names = "extclk";
+		gpios = <&gpj1 0 GPIO_ACTIVE_LOW>;
+
+		port {
+			is_s5k6a3_ep: endpoint {
+				remote-endpoint = <&csis1_ep>;
+				data-lanes = <1>;
+			};
+		};
 	};
 };
 
@@ -892,6 +1023,12 @@
 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
 	};
 
+	cam_vt_nrst: cam-vt-nrst-pins {
+		samsung,pins = "gpj1-0";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+	};
+
 	lineout_en: lineout-en-pins {
 		samsung,pins = "gpj1-2";
 		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
@@ -1034,6 +1171,18 @@
 
 	main_mic_bias: main-mic-bias-pins {
 		samsung,pins = "gpm0-0";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+	};
+
+	charger_irq: charger-irq-pins {
+		samsung,pins = "gpm0-3";
+		samsung,pin-function = <EXYNOS_PIN_FUNC_F>;
+		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
+	};
+
+	cam_flash: cam-flash-pins {
+		samsung,pins = "gpm3-6", "gpm3-7";
 		samsung,pin-function = <EXYNOS_PIN_FUNC_OUTPUT>;
 		samsung,pin-pud = <EXYNOS_PIN_PULL_NONE>;
 	};
@@ -1385,6 +1534,7 @@
 	#address-cells = <1>;
 	#size-cells = <0>;
 	non-removable;
+	cap-power-off-card;
 	bus-width = <4>;
 	mmc-pwrseq = <&wlan_pwrseq>;
 
