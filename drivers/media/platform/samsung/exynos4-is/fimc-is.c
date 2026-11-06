@@ -289,12 +289,12 @@ int fimc_is_cpu_set_power(struct fimc_is *is, int on)
 
 /* Wait until @bit of @is->state is set to @state in the interrupt handler. */
 int fimc_is_wait_event(struct fimc_is *is, unsigned long bit,
-		       unsigned int state, unsigned int timeout)
+		       unsigned int state, unsigned int timeout_ms)
 {
 
 	int ret = wait_event_timeout(is->irq_queue,
 				     !state ^ test_bit(bit, &is->state),
-				     timeout);
+				     msecs_to_jiffies(timeout_ms));
 	if (ret == 0) {
 		dev_WARN(&is->pdev->dev, "%s() timed out\n", __func__);
 		return -ETIME;
@@ -320,7 +320,7 @@ int fimc_is_start_firmware(struct fimc_is *is)
 		return ret;
 
 	ret = fimc_is_wait_event(is, IS_ST_A5_PWR_ON, 1,
-				 msecs_to_jiffies(FIMC_IS_FW_LOAD_TIMEOUT));
+				 FIMC_IS_FW_LOAD_TIMEOUT);
 	if (ret < 0)
 		dev_err(dev, "FIMC-IS CPU power on failed\n");
 
@@ -615,6 +615,8 @@ static int fimc_is_hw_open_sensor(struct fimc_is *is,
 				  struct fimc_is_sensor *sensor)
 {
 	struct sensor_open_extended *soe = (void *)&is->is_p_region->shared;
+	dma_addr_t soe_dma_addr = is->is_dma_p_region +
+					offsetof(struct is_region, shared);
 
 	fimc_is_hw_wait_intmsr0_intmsd0(is);
 
@@ -638,7 +640,7 @@ static int fimc_is_hw_open_sensor(struct fimc_is *is,
 	mcuctl_write(is->sensor_index, is, MCUCTL_REG_ISSR(1));
 	mcuctl_write(sensor->drvdata->id, is, MCUCTL_REG_ISSR(2));
 	mcuctl_write(sensor->i2c_bus, is, MCUCTL_REG_ISSR(3));
-	mcuctl_write(is->is_dma_p_region, is, MCUCTL_REG_ISSR(4));
+	mcuctl_write(soe_dma_addr, is, MCUCTL_REG_ISSR(4));
 
 	fimc_is_hw_set_intgr0_gd0(is);
 

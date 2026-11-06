@@ -9,6 +9,7 @@
 #include <linux/module.h>
 #include <linux/kernel.h>
 #include <linux/types.h>
+#include <linux/bits.h>
 #include <linux/errno.h>
 #include <linux/bug.h>
 #include <linux/interrupt.h>
@@ -455,10 +456,20 @@ void fimc_prepare_dma_offset(struct fimc_ctx *ctx, struct fimc_frame *f)
 	    f->fmt->color, f->dma_offset.y_h, f->dma_offset.y_v);
 }
 
+#define FIMC_COLORFX_MASK	(BIT(V4L2_COLORFX_NONE)		| \
+				 BIT(V4L2_COLORFX_BW)		| \
+				 BIT(V4L2_COLORFX_SEPIA)	| \
+				 BIT(V4L2_COLORFX_NEGATIVE)	| \
+				 BIT(V4L2_COLORFX_EMBOSS)	| \
+				 BIT(V4L2_COLORFX_ART_FREEZE)	| \
+				 BIT(V4L2_COLORFX_SILHOUETTE)	| \
+				 BIT(V4L2_COLORFX_SET_CBCR))
+
 static int fimc_set_color_effect(struct fimc_ctx *ctx, enum v4l2_colorfx colorfx)
 {
 	struct fimc_effect *effect = &ctx->effect;
 
+	/* keep the switch statement and the bitmask above in sync */
 	switch (colorfx) {
 	case V4L2_COLORFX_NONE:
 		effect->type = FIMC_REG_CIIMGEFF_FIN_BYPASS;
@@ -596,7 +607,7 @@ int fimc_ctrls_create(struct fimc_ctx *ctx)
 
 	ctrls->colorfx = v4l2_ctrl_new_std_menu(handler, &fimc_ctrl_ops,
 				V4L2_CID_COLORFX, V4L2_COLORFX_SET_CBCR,
-				~0x983f, V4L2_COLORFX_NONE);
+				~FIMC_COLORFX_MASK, V4L2_COLORFX_NONE);
 
 	ctrls->colorfx_cbcr = v4l2_ctrl_new_std(handler, &fimc_ctrl_ops,
 				V4L2_CID_COLORFX_CBCR, 0, 0xffff, 1, 0);
